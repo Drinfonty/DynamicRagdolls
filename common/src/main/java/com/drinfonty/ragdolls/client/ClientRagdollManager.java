@@ -18,6 +18,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Avatar;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.MaceItem;
@@ -72,7 +73,7 @@ public final class ClientRagdollManager {
 	 */
 	public synchronized void onEntityDeath(LivingEntity entity, DamageSource damageSource) {
 		RagdollsConfig config = RagdollsConfig.get();
-		if (!config.ragdollsEnabled || entity == null || !entity.level().isClientSide()) {
+		if (!config.ragdollsEnabled || entity == null || !entity.level().isClientSide() || entity instanceof ArmorStand) {
 			return;
 		}
 		if (this.ragdollsByEntityId.containsKey(entity.getId())) {

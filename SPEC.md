@@ -23,10 +23,12 @@ Ragdolls is a client-only Minecraft mod (supporting both **Fabric** and **NeoFor
 When a player (or enabled humanoid entity) is killed:
 1.  **Death Detection**: Detects death client-side via `LivingEntity.handleEntityEvent((byte) 3)` and `LivingEntity.tick` (`isDeadOrDying()` / `deathTime > 0`).
 2.  **Articulated 12-Node Verlet Skeleton**:
-    *   **Torso Truss (7 nodes)**: `NECK`, `PELVIS`, `LEFT_SHOULDER`, `RIGHT_SHOULDER`, `LEFT_HIP`, `RIGHT_HIP`, and `CHEST_FRONT` connected by rigid distance constraints and a tetrahedral chirality constraint so the torso maintains a true 3D orthonormal frame $(\mathbf{e}_x, \mathbf{e}_y, \mathbf{e}_z)$ and never flips inside-out.
+    *   **Torso Truss (7 nodes)**: `NECK`, `PELVIS`, `LEFT_SHOULDER`, `RIGHT_SHOULDER`, `LEFT_HIP`, `RIGHT_HIP`, and `CHEST_FRONT` connected by rigid distance constraints and shape-matched to a true 3D orthonormal frame $(\mathbf{e}_x, \mathbf{e}_y, \mathbf{e}_z)$ (`enforceTorsoRigidity`) so the torso never buckles or collapses its shoulder/hip sockets.
     *   **Distal Limb Nodes (5 nodes)**: `HEAD_TOP`, `LEFT_HAND`, `RIGHT_HAND`, `LEFT_FOOT`, and `RIGHT_FOOT` connected to their respective neck, shoulder, and hip pivots.
-3.  **Anatomical Joint Angle Constraints (`JointAngleConstraint`)**:
-    *   Enforces directional cone limits in torso-local space for the neck, left/right shoulders, and left/right hips, preventing unnatural self-intersection while allowing organic ragdoll folding and tumbling.
+3.  **Anatomical Joint Angle Constraints & Self-Collision (`JointAngleConstraint`, `RagdollSkeleton`)**:
+    *   Enforces directional cone limits in torso-local space for the neck, left/right shoulders, and left/right hips.
+    *   **Torso OBB vs. Limb Self-Collision (`solveTorsoLimbCollisions`)**: Prevents arms, legs, and head from clipping into the torso volume (`[-4u, +4u] x [0, 12u] x [-2u, +2u]`) or inverting above the shoulder into the head/neck.
+    *   **3D Capsule-vs-Capsule Limb Collisions (`solveLimbCapsuleCollisions`)**: Resolves closest-point segment-to-segment separation between arms, legs, and the head so limbs collide against each other rather than overlapping.
     *   Transports limb frames from the torso frame via shortest-arc quaternion rotation (parallel transport) so limbs never twist around their long axis like a drill.
 
 ### 2.2 Directional Death Impulse & Knockback
@@ -35,7 +37,7 @@ When a player (or enabled humanoid entity) is killed:
 *   **Weapon Scaling**: Scales knockback impulse by weapon category (Fist/Blunt `0.6x`, Sword `1.1x`, Axe `1.5x`, Mace/Explosion `2.2x`, Projectile `0.9x`) multiplied by the user's configured `knockbackMultiplier`.
 
 ### 2.3 World Block Collision & Fluid Physics
-*   **VoxelShape Collision**: Queries surrounding block collision shapes (`BlockState.getCollisionShape`) via the loader-neutral `RagdollWorld` interface, resolving sphere-vs-AABB collisions for all 12 skeleton nodes and limb midpoints against full blocks, slabs, stairs, snow layers, anvils, and walls.
+*   **VoxelShape Collision**: Queries surrounding block collision shapes (`BlockState.getCollisionShape`) via the loader-neutral `RagdollWorld` interface, resolving sphere-vs-AABB collisions for all physical skeleton nodes against full blocks, slabs, stairs, snow layers, anvils, and walls.
 *   **Restitution & Friction**: Applies configurable bounce restitution (`bounciness`) along surface normals and tangential friction (`groundFriction`) when sliding or tumbling across blocks.
 *   **Underwater Buoyancy & Drag**: Submerged ragdoll nodes experience upward buoyancy and high viscous water drag (`waterBuoyancy`), drifting and sinking naturally in water.
 *   **Settling / Sleep Optimization**: Ragdolls resting motionless on solid ground automatically enter a low-cost settled state and wake up if supporting blocks are broken or modified.
@@ -43,7 +45,7 @@ When a player (or enabled humanoid entity) is killed:
 ### 2.4 Entity Scope & Seamless Skin/Equipment Rendering
 *   **Entity Scope**:
     *   **Players Only** (default): Spawns ragdolls for all players (`AbstractClientPlayer`, `LocalPlayer`, `RemotePlayer`, and `ClientMannequin` / `Avatar`).
-    *   **All Humanoids** (configurable): Also enables ragdolls for any entity whose renderer uses a `HumanoidRenderState` / `HumanoidModel` (Zombies, Husks, Drowned, Skeletons, Strays, Wither Skeletons, Bogged, Piglins, etc.).
+    *   **All Humanoids** (configurable): Also enables ragdolls for any entity whose renderer uses a `HumanoidRenderState` (`HumanoidModel` and `IllagerModel`: Zombies, Husks, Drowned, Parched, Skeletons, Strays, Wither Skeletons, Bogged, Piglins, Pillagers, Vindicators, Evokers, Illusioners, etc.).
 *   **Persistent RenderState Snapshot**:
     *   Snapshots the entity's `HumanoidRenderState` (`AvatarRenderState` for players) upon death and submits it directly through `EntityRenderDispatcher` in `LevelRenderer.submitEntities`.
     *   Preserves the player's skin texture, slim/wide arm model, outer skin layers (hat, jacket, sleeves, pants), equipped armor (`HumanoidArmorLayer`), and held items (`ItemInHandLayer`).

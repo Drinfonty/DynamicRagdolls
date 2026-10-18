@@ -7,9 +7,11 @@ import com.drinfonty.ragdolls.physics.RagdollSkeleton;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
+import net.minecraft.client.renderer.entity.state.IllagerRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.monster.illager.AbstractIllager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.LightLayer;
 
@@ -67,6 +69,10 @@ public final class RagdollInstance {
 			avatarState.shouldApplyFlyingYRot = false;
 			avatarState.parrotOnLeftShoulder = null;
 			avatarState.parrotOnRightShoulder = null;
+		}
+		if (this.renderState instanceof IllagerRenderState illagerState) {
+			illagerState.isRiding = false;
+			illagerState.armPose = AbstractIllager.IllagerArmPose.NEUTRAL;
 		}
 	}
 

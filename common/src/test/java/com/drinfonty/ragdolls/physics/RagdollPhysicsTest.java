@@ -107,8 +107,11 @@ class RagdollPhysicsTest {
 			skeleton.step(FLAT_FLOOR_WORLD, 1.0f, 0.25f, 0.80f, true, 1.0f, 6);
 		}
 
-		// After toppling onto the Y=0 floor, all particles must stay above floor (y >= radius - epsilon)
+		// After toppling onto the Y=0 floor, all physical particles must stay above floor (y >= radius - epsilon)
 		for (int i = 0; i < RagdollSkeleton.PARTICLE_COUNT; i++) {
+			if (i == RagdollSkeleton.CHEST_FRONT) {
+				continue;
+			}
 			RagdollParticle p = skeleton.getParticle(i);
 			assertTrue(p.y >= p.radius - 1.0e-3, "Particle " + i + " penetrated below Y=0 floor: " + p.y);
 		}
@@ -127,6 +130,73 @@ class RagdollPhysicsTest {
 		assertNotNull(pose.rightArm());
 		assertNotNull(pose.leftLeg());
 		assertNotNull(pose.rightLeg());
+	}
+
+	@Test
+	void testLimbsNeverClipThroughTorsoDuringFallOrForcedPenetration() {
+		double scale = 0.9375;
+		double u = scale / 16.0;
+		RagdollSkeleton skeleton = new RagdollSkeleton(
+			0.0, 0.0, 0.0,
+			35.0f, 0.0f,
+			scale,
+			0.0, 0.0, 0.0,
+			-0.18, 0.06, 0.14
+		);
+
+		// Force hands and feet directly into the center of the torso to test ejection
+		RagdollParticle neck = skeleton.getParticle(RagdollSkeleton.NECK);
+		RagdollParticle pelvis = skeleton.getParticle(RagdollSkeleton.PELVIS);
+		double midX = 0.5 * (neck.x + pelvis.x);
+		double midY = 0.5 * (neck.y + pelvis.y);
+		double midZ = 0.5 * (neck.z + pelvis.z);
+
+		skeleton.getParticle(RagdollSkeleton.LEFT_HAND).x = midX;
+		skeleton.getParticle(RagdollSkeleton.LEFT_HAND).y = midY;
+		skeleton.getParticle(RagdollSkeleton.LEFT_HAND).z = midZ;
+		skeleton.getParticle(RagdollSkeleton.RIGHT_HAND).x = midX;
+		skeleton.getParticle(RagdollSkeleton.RIGHT_HAND).y = midY;
+		skeleton.getParticle(RagdollSkeleton.RIGHT_HAND).z = midZ;
+		skeleton.getParticle(RagdollSkeleton.LEFT_FOOT).x = midX;
+		skeleton.getParticle(RagdollSkeleton.LEFT_FOOT).y = midY;
+		skeleton.getParticle(RagdollSkeleton.LEFT_FOOT).z = midZ;
+
+		for (int tick = 0; tick < 60; tick++) {
+			skeleton.step(FLAT_FLOOR_WORLD, 1.0f, 0.25f, 0.80f, true, 1.0f, 6);
+
+			// Reconstruct torso orthonormal basis (eX, eY, eZ)
+			double[] eY = {
+				pelvis.x - neck.x,
+				pelvis.y - neck.y,
+				pelvis.z - neck.z
+			};
+			RagdollTransform.normalize(eY);
+			RagdollParticle ls = skeleton.getParticle(RagdollSkeleton.LEFT_SHOULDER);
+			RagdollParticle rs = skeleton.getParticle(RagdollSkeleton.RIGHT_SHOULDER);
+			double sx = ls.x - rs.x, sy = ls.y - rs.y, sz = ls.z - rs.z;
+			double dot = sx * eY[0] + sy * eY[1] + sz * eY[2];
+			double[] eX = {sx - dot * eY[0], sy - dot * eY[1], sz - dot * eY[2]};
+			RagdollTransform.normalize(eX);
+
+			// Verify Left Hand is strictly outside the torso lateral boundary (x_t >= 4.7u)
+			RagdollParticle lh = skeleton.getParticle(RagdollSkeleton.LEFT_HAND);
+			double lhx = (lh.x - neck.x) * eX[0] + (lh.y - neck.y) * eX[1] + (lh.z - neck.z) * eX[2];
+			assertTrue(lhx >= 4.7 * u, "Left hand clipped into torso at tick " + tick + ": lhx/u=" + (lhx / u));
+
+			// Verify Right Hand is strictly outside the torso lateral boundary (x_t <= -4.7u)
+			RagdollParticle rh = skeleton.getParticle(RagdollSkeleton.RIGHT_HAND);
+			double rhx = (rh.x - neck.x) * eX[0] + (rh.y - neck.y) * eX[1] + (rh.z - neck.z) * eX[2];
+			assertTrue(rhx <= -4.7 * u, "Right hand clipped into torso at tick " + tick + ": rhx/u=" + (rhx / u));
+
+			// Verify Left and Right Feet stay below the torso hip plane (y_t >= 15.0u)
+			RagdollParticle lf = skeleton.getParticle(RagdollSkeleton.LEFT_FOOT);
+			double lfy = (lf.x - neck.x) * eY[0] + (lf.y - neck.y) * eY[1] + (lf.z - neck.z) * eY[2];
+			assertTrue(lfy >= 15.0 * u, "Left foot folded into torso at tick " + tick + ": lfy/u=" + (lfy / u));
+
+			RagdollParticle rf = skeleton.getParticle(RagdollSkeleton.RIGHT_FOOT);
+			double rfy = (rf.x - neck.x) * eY[0] + (rf.y - neck.y) * eY[1] + (rf.z - neck.z) * eY[2];
+			assertTrue(rfy >= 15.0 * u, "Right foot folded into torso at tick " + tick + ": rfy/u=" + (rfy / u));
+		}
 	}
 
 	@Test

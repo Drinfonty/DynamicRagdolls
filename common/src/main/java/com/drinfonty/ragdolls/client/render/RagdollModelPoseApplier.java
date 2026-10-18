@@ -2,22 +2,29 @@ package com.drinfonty.ragdolls.client.render;
 
 import com.drinfonty.ragdolls.physics.RagdollPose;
 import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
 
 /**
- * Applies a 6-limb {@link RagdollPose} directly to a {@link HumanoidModel}'s ModelParts.
+ * Applies a 6-limb {@link RagdollPose} directly to a {@link HumanoidModel} or any compatible
+ * {@link Model} (such as {@code IllagerModel} for Pillagers, Vindicators, Evokers, and Illusioners).
  */
 public final class RagdollModelPoseApplier {
 	private RagdollModelPoseApplier() {
 	}
 
 	public static void applyIfPresent(Object modelObj, Object stateObj) {
-		if (modelObj instanceof HumanoidModel<?> model
-			&& stateObj instanceof RagdollStateAttachment attachment) {
-			RagdollPose pose = attachment.ragdolls$getPose();
-			if (pose != null) {
-				apply(model, pose);
-			}
+		if (!(stateObj instanceof RagdollStateAttachment attachment)) {
+			return;
+		}
+		RagdollPose pose = attachment.ragdolls$getPose();
+		if (pose == null) {
+			return;
+		}
+		if (modelObj instanceof HumanoidModel<?> humanoidModel) {
+			apply(humanoidModel, pose);
+		} else if (modelObj instanceof Model<?> genericModel) {
+			applyToGenericModel(genericModel, pose);
 		}
 	}
 
@@ -33,6 +40,45 @@ public final class RagdollModelPoseApplier {
 		applyPart(model.rightArm, pose.rightArm());
 		applyPart(model.leftLeg, pose.leftLeg());
 		applyPart(model.rightLeg, pose.rightLeg());
+	}
+
+	private static void applyToGenericModel(Model<?> model, RagdollPose pose) {
+		ModelPart root = model.root();
+		if (root == null) {
+			return;
+		}
+		if (root.hasChild("head")) {
+			ModelPart head = root.getChild("head");
+			applyPart(head, pose.head());
+			if (head.hasChild("hat")) {
+				ModelPart hat = head.getChild("hat");
+				hat.setPos(0.0f, 0.0f, 0.0f);
+				hat.setRotation(0.0f, 0.0f, 0.0f);
+			}
+		}
+		if (root.hasChild("body")) {
+			applyPart(root.getChild("body"), pose.body());
+		}
+		if (root.hasChild("left_arm")) {
+			ModelPart leftArm = root.getChild("left_arm");
+			leftArm.visible = true;
+			applyPart(leftArm, pose.leftArm());
+		}
+		if (root.hasChild("right_arm")) {
+			ModelPart rightArm = root.getChild("right_arm");
+			rightArm.visible = true;
+			applyPart(rightArm, pose.rightArm());
+		}
+		if (root.hasChild("left_leg")) {
+			applyPart(root.getChild("left_leg"), pose.leftLeg());
+		}
+		if (root.hasChild("right_leg")) {
+			applyPart(root.getChild("right_leg"), pose.rightLeg());
+		}
+		if (root.hasChild("arms")) {
+			// Hide static crossed-arms part on IllagerModel so the articulated left_arm/right_arm render
+			root.getChild("arms").visible = false;
+		}
 	}
 
 	private static void applyPart(ModelPart part, RagdollPose.LimbTransform transform) {

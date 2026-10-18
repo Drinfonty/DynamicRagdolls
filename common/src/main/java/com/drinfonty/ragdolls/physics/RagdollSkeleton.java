@@ -98,16 +98,16 @@ public final class RagdollSkeleton {
 		double rightLegLength = addRestDistance(RIGHT_HIP, RIGHT_FOOT, 1.0);
 
 		// 3. Anatomical joint angle cone constraints in torso frame (eX = Left, eY = Down, eZ = Back):
-		// - Head points UP (-eY), allowed cone ~50 deg
-		this.jointConstraints.add(new JointAngleConstraint(NECK, HEAD_TOP, headLength, 0.0, -1.0, -0.08, Math.toRadians(50.0)));
-		// - Left arm points Down-Left-SlightlyForward (+0.25 eX, +0.92 eY, -0.25 eZ), allowed cone ~105 deg
-		this.jointConstraints.add(new JointAngleConstraint(LEFT_SHOULDER, LEFT_HAND, leftArmLength, 0.25, 0.92, -0.25, Math.toRadians(105.0)));
-		// - Right arm points Down-Right-SlightlyForward (-0.25 eX, +0.92 eY, -0.25 eZ), allowed cone ~105 deg
-		this.jointConstraints.add(new JointAngleConstraint(RIGHT_SHOULDER, RIGHT_HAND, rightArmLength, -0.25, 0.92, -0.25, Math.toRadians(105.0)));
-		// - Left leg points Down-SlightlyLeft-Forward (+0.08 eX, +0.94 eY, -0.32 eZ), allowed cone ~75 deg
-		this.jointConstraints.add(new JointAngleConstraint(LEFT_HIP, LEFT_FOOT, leftLegLength, 0.08, 0.94, -0.32, Math.toRadians(75.0)));
-		// - Right leg points Down-SlightlyRight-Forward (-0.08 eX, +0.94 eY, -0.32 eZ), allowed cone ~75 deg
-		this.jointConstraints.add(new JointAngleConstraint(RIGHT_HIP, RIGHT_FOOT, rightLegLength, -0.08, 0.94, -0.32, Math.toRadians(75.0)));
+		// - Head points UP (-eY), allowed cone ~40 deg so head cube never dips into shoulders/torso
+		this.jointConstraints.add(new JointAngleConstraint(NECK, HEAD_TOP, headLength, 0.0, -1.0, -0.05, Math.toRadians(40.0)));
+		// - Left arm points Down-OutwardLeft-SlightlyForward (+0.42 eX, +0.87 eY, -0.25 eZ), allowed cone ~75 deg
+		this.jointConstraints.add(new JointAngleConstraint(LEFT_SHOULDER, LEFT_HAND, leftArmLength, 0.42, 0.87, -0.25, Math.toRadians(75.0)));
+		// - Right arm points Down-OutwardRight-SlightlyForward (-0.42 eX, +0.87 eY, -0.25 eZ), allowed cone ~75 deg
+		this.jointConstraints.add(new JointAngleConstraint(RIGHT_SHOULDER, RIGHT_HAND, rightArmLength, -0.42, 0.87, -0.25, Math.toRadians(75.0)));
+		// - Left leg points Down-OutwardLeft-Forward (+0.22 eX, +0.92 eY, -0.30 eZ), allowed cone ~62 deg
+		this.jointConstraints.add(new JointAngleConstraint(LEFT_HIP, LEFT_FOOT, leftLegLength, 0.22, 0.92, -0.30, Math.toRadians(62.0)));
+		// - Right leg points Down-OutwardRight-Forward (-0.22 eX, +0.92 eY, -0.30 eZ), allowed cone ~62 deg
+		this.jointConstraints.add(new JointAngleConstraint(RIGHT_HIP, RIGHT_FOOT, rightLegLength, -0.22, 0.92, -0.30, Math.toRadians(62.0)));
 
 		// 4. Apply initial entity velocity + directional death knockback impulse (with upper-body torque so ragdoll topples!)
 		for (int i = 0; i < PARTICLE_COUNT; i++) {
@@ -233,32 +233,51 @@ public final class RagdollSkeleton {
 					dc.solve(this.particles);
 				}
 
-				enforceTorsoChirality(torsoEx, torsoEy, torsoEz);
+				enforceTorsoRigidity(torsoEx, torsoEy, torsoEz);
 
 				for (JointAngleConstraint jc : this.jointConstraints) {
 					jc.solve(this.particles, torsoEx, torsoEy, torsoEz, jointConeScale);
 				}
 
-				solveMinSeparation(LEFT_FOOT, RIGHT_FOOT, 3.2 * this.pixelUnit);
-				solveMinSeparation(LEFT_HAND, RIGHT_HAND, 2.5 * this.pixelUnit);
+				solveTorsoLimbCollisions(torsoEx, torsoEy, torsoEz);
+				solveLimbCapsuleCollisions();
 
-				for (RagdollParticle p : this.particles) {
-					resolveParticleCollision(p, worldBoxes, bounciness, groundFriction);
+				for (int i = 0; i < PARTICLE_COUNT; i++) {
+					if (i == CHEST_FRONT) {
+						continue;
+					}
+					resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction);
 				}
 			}
 		}
 
+		// Final polish pass to guarantee exact bone lengths and zero self-penetration after world collision
 		for (DistanceConstraint dc : this.distanceConstraints) {
 			dc.solve(this.particles);
 		}
-		enforceTorsoChirality(torsoEx, torsoEy, torsoEz);
-		for (RagdollParticle p : this.particles) {
-			resolveParticleCollision(p, worldBoxes, bounciness, groundFriction);
+		enforceTorsoRigidity(torsoEx, torsoEy, torsoEz);
+		solveTorsoLimbCollisions(torsoEx, torsoEy, torsoEz);
+		solveLimbCapsuleCollisions();
+		for (DistanceConstraint dc : this.distanceConstraints) {
+			dc.solve(this.particles);
 		}
+		enforceTorsoRigidity(torsoEx, torsoEy, torsoEz);
+		for (int i = 0; i < PARTICLE_COUNT; i++) {
+			if (i == CHEST_FRONT) {
+				continue;
+			}
+			resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction);
+		}
+		solveTorsoLimbCollisions(torsoEx, torsoEy, torsoEz);
+		solveLimbCapsuleCollisions();
 
 		double maxSpeedSq = 0.0;
 		int groundedCount = 0;
-		for (RagdollParticle p : this.particles) {
+		for (int i = 0; i < PARTICLE_COUNT; i++) {
+			if (i == CHEST_FRONT) {
+				continue;
+			}
+			RagdollParticle p = this.particles[i];
 			double dx = p.x - p.renderPrevX;
 			double dy = p.y - p.renderPrevY;
 			double dz = p.z - p.renderPrevZ;
@@ -287,63 +306,400 @@ public final class RagdollSkeleton {
 		}
 	}
 
-	private void solveMinSeparation(int idxA, int idxB, double minDist) {
-		RagdollParticle a = this.particles[idxA];
-		RagdollParticle b = this.particles[idxB];
-		double dx = b.x - a.x;
-		double dy = b.y - a.y;
-		double dz = b.z - a.z;
-		double distSq = dx * dx + dy * dy + dz * dz;
-		if (distSq < minDist * minDist && distSq > 1.0e-10) {
-			double dist = Math.sqrt(distSq);
-			double push = (minDist - dist) * 0.5 / dist;
-			a.x -= dx * push;
-			a.y -= dy * push;
-			a.z -= dz * push;
-			b.x += dx * push;
-			b.y += dy * push;
-			b.z += dz * push;
-		}
-	}
-
-	private void enforceTorsoChirality(double[] eX, double[] eY, double[] eZ) {
+	/**
+	 * Extracts the right-handed orthonormal torso frame (eX = Left, eY = Down, eZ = Back)
+	 * and shape-matches the 7 torso particles to their exact anatomical rest offsets so the
+	 * torso never buckles or collapses its shoulder/hip sockets into the chest.
+	 */
+	private void enforceTorsoRigidity(double[] eX, double[] eY, double[] eZ) {
 		RagdollParticle neck = this.particles[NECK];
 		RagdollParticle pelvis = this.particles[PELVIS];
 		RagdollParticle leftShoulder = this.particles[LEFT_SHOULDER];
 		RagdollParticle rightShoulder = this.particles[RIGHT_SHOULDER];
+		RagdollParticle leftHip = this.particles[LEFT_HIP];
+		RagdollParticle rightHip = this.particles[RIGHT_HIP];
 		RagdollParticle chestFront = this.particles[CHEST_FRONT];
 
-		eY[0] = pelvis.x - neck.x;
-		eY[1] = pelvis.y - neck.y;
-		eY[2] = pelvis.z - neck.z;
+		double u = this.pixelUnit;
+
+		// 1. Primary spine axis eY (Down: neck -> pelvis)
+		eY[0] = (pelvis.x - neck.x) + 0.25 * (0.5 * (leftHip.x + rightHip.x) - 0.5 * (leftShoulder.x + rightShoulder.x));
+		eY[1] = (pelvis.y - neck.y) + 0.25 * (0.5 * (leftHip.y + rightHip.y) - 0.5 * (leftShoulder.y + rightShoulder.y));
+		eY[2] = (pelvis.z - neck.z) + 0.25 * (0.5 * (leftHip.z + rightHip.z) - 0.5 * (leftShoulder.z + rightShoulder.z));
 		RagdollTransform.normalize(eY);
 
-		double sx = leftShoulder.x - rightShoulder.x;
-		double sy = leftShoulder.y - rightShoulder.y;
-		double sz = leftShoulder.z - rightShoulder.z;
+		// 2. Lateral axis eX (Left: rightShoulder -> leftShoulder + hip contribution)
+		double sx = (leftShoulder.x - rightShoulder.x) + 0.5 * (leftHip.x - rightHip.x);
+		double sy = (leftShoulder.y - rightShoulder.y) + 0.5 * (leftHip.y - rightHip.y);
+		double sz = (leftShoulder.z - rightShoulder.z) + 0.5 * (leftHip.z - rightHip.z);
 		double dot = sx * eY[0] + sy * eY[1] + sz * eY[2];
 		eX[0] = sx - dot * eY[0];
 		eX[1] = sy - dot * eY[1];
 		eX[2] = sz - dot * eY[2];
 		RagdollTransform.normalize(eX);
 
+		// 3. Back axis eZ = eX x eY
 		RagdollTransform.cross(eX, eY, eZ);
 		RagdollTransform.normalize(eZ);
 
-		double midX = 0.5 * (neck.x + pelvis.x);
-		double midY = 0.5 * (neck.y + pelvis.y);
-		double midZ = 0.5 * (neck.z + pelvis.z);
+		// 4. Compute torso center (midpoint between neck and pelvis at 6u below neck)
+		double spineMidX = 0.5 * (neck.x + pelvis.x);
+		double spineMidY = 0.5 * (neck.y + pelvis.y);
+		double spineMidZ = 0.5 * (neck.z + pelvis.z);
 
-		double cx = chestFront.x - midX;
-		double cy = chestFront.y - midY;
-		double cz = chestFront.z - midZ;
-		double targetDepth = 3.5 * this.pixelUnit;
-		double signedBackDist = cx * eZ[0] + cy * eZ[1] + cz * eZ[2];
-		if (signedBackDist > -targetDepth * 0.5) {
-			double correction = (-targetDepth - signedBackDist);
-			chestFront.x += eZ[0] * correction;
-			chestFront.y += eZ[1] * correction;
-			chestFront.z += eZ[2] * correction;
+		double shoulderMidX = 0.5 * (leftShoulder.x + rightShoulder.x) + 4.0 * u * eY[0];
+		double shoulderMidY = 0.5 * (leftShoulder.y + rightShoulder.y) + 4.0 * u * eY[1];
+		double shoulderMidZ = 0.5 * (leftShoulder.z + rightShoulder.z) + 4.0 * u * eY[2];
+
+		double hipMidX = 0.5 * (leftHip.x + rightHip.x) - 6.0 * u * eY[0];
+		double hipMidY = 0.5 * (leftHip.y + rightHip.y) - 6.0 * u * eY[1];
+		double hipMidZ = 0.5 * (leftHip.z + rightHip.z) - 6.0 * u * eY[2];
+
+		double midX = 0.5 * spineMidX + 0.25 * shoulderMidX + 0.25 * hipMidX;
+		double midY = 0.5 * spineMidY + 0.25 * shoulderMidY + 0.25 * hipMidY;
+		double midZ = 0.5 * spineMidZ + 0.25 * shoulderMidZ + 0.25 * hipMidZ;
+
+		// 5. Shape-match all 7 torso nodes to exact rigid coordinates in (eX, eY, eZ)
+		neck.x = midX - 6.0 * u * eY[0];
+		neck.y = midY - 6.0 * u * eY[1];
+		neck.z = midZ - 6.0 * u * eY[2];
+
+		pelvis.x = midX + 6.0 * u * eY[0];
+		pelvis.y = midY + 6.0 * u * eY[1];
+		pelvis.z = midZ + 6.0 * u * eY[2];
+
+		leftShoulder.x = neck.x + 5.0 * u * eX[0] + 2.0 * u * eY[0];
+		leftShoulder.y = neck.y + 5.0 * u * eX[1] + 2.0 * u * eY[1];
+		leftShoulder.z = neck.z + 5.0 * u * eX[2] + 2.0 * u * eY[2];
+
+		rightShoulder.x = neck.x - 5.0 * u * eX[0] + 2.0 * u * eY[0];
+		rightShoulder.y = neck.y - 5.0 * u * eX[1] + 2.0 * u * eY[1];
+		rightShoulder.z = neck.z - 5.0 * u * eX[2] + 2.0 * u * eY[2];
+
+		leftHip.x = neck.x + 1.9 * u * eX[0] + 12.0 * u * eY[0];
+		leftHip.y = neck.y + 1.9 * u * eX[1] + 12.0 * u * eY[1];
+		leftHip.z = neck.z + 1.9 * u * eX[2] + 12.0 * u * eY[2];
+
+		rightHip.x = neck.x - 1.9 * u * eX[0] + 12.0 * u * eY[0];
+		rightHip.y = neck.y - 1.9 * u * eX[1] + 12.0 * u * eY[1];
+		rightHip.z = neck.z - 1.9 * u * eX[2] + 12.0 * u * eY[2];
+
+		chestFront.x = midX - 3.5 * u * eZ[0];
+		chestFront.y = midY - 3.5 * u * eZ[1];
+		chestFront.z = midZ - 3.5 * u * eZ[2];
+	}
+
+	/**
+	 * Prevents all 5 limbs (head, left/right arms, left/right legs) from clipping into the
+	 * torso volume [-4u, +4u] x [0, 12u] x [-2u, +2u] or the head volume in torso-local space.
+	 */
+	private void solveTorsoLimbCollisions(double[] eX, double[] eY, double[] eZ) {
+		double u = this.pixelUnit;
+
+		// 1. Left Arm (pivot at +5u, +2u, 0; length 10u; inner face at x_arm = -1u):
+		// Keep LEFT_HAND outside the torso & head lateral plane (x_t >= 5.3u beside torso, >= 4.8u in front/back)
+		// and prevent upside-down shoulder inversion (y_t >= 2.0u).
+		clampLimbInTorsoSpace(LEFT_SHOULDER, LEFT_HAND, 10.0 * u, eX, eY, eZ, true, false);
+
+		// 2. Right Arm (pivot at -5u, +2u, 0; length 10u; inner face at x_arm = +1u):
+		clampLimbInTorsoSpace(RIGHT_SHOULDER, RIGHT_HAND, 10.0 * u, eX, eY, eZ, false, false);
+
+		// 3. Left Leg (pivot at +1.9u, +12u, 0; length 10.2u):
+		// Keep LEFT_FOOT below the torso hip plane (y_t >= 15.5u) and on the left side of the midline (x_t >= 1.9u).
+		clampLimbInTorsoSpace(LEFT_HIP, LEFT_FOOT, 10.2 * u, eX, eY, eZ, true, true);
+
+		// 4. Right Leg (pivot at -1.9u, +12u, 0; length 10.2u):
+		clampLimbInTorsoSpace(RIGHT_HIP, RIGHT_FOOT, 10.2 * u, eX, eY, eZ, false, true);
+
+		// 5. Head (pivot at 0, 0, 0; length 7u):
+		// Ensure HEAD_TOP stays above the neck/shoulder plane (y_t <= -5.2u) so the 8x8x8 head cube never dips into the chest.
+		RagdollParticle neck = this.particles[NECK];
+		RagdollParticle head = this.particles[HEAD_TOP];
+		double hdx = head.x - neck.x;
+		double hdy = head.y - neck.y;
+		double hdz = head.z - neck.z;
+		double hx = hdx * eX[0] + hdy * eX[1] + hdz * eX[2];
+		double hy = hdx * eY[0] + hdy * eY[1] + hdz * eY[2];
+		double hz = hdx * eZ[0] + hdy * eZ[1] + hdz * eZ[2];
+		double minHeadUpY = -5.2 * u;
+		if (hy > minHeadUpY) {
+			hy = minHeadUpY;
+			double maxLat = 4.6 * u;
+			double latSq = hx * hx + hz * hz;
+			if (latSq > maxLat * maxLat) {
+				double scale = maxLat / Math.sqrt(latSq);
+				hx *= scale;
+				hz *= scale;
+			}
+			double len = Math.sqrt(hx * hx + hy * hy + hz * hz);
+			if (len > 1.0e-8) {
+				double s = (7.0 * u) / len;
+				hx *= s;
+				hy *= s;
+				hz *= s;
+			}
+			applyTorsoLocalPosition(neck, head, hx, hy, hz, eX, eY, eZ);
+		}
+	}
+
+	private void clampLimbInTorsoSpace(
+		int pivotIdx,
+		int tipIdx,
+		double limbLength,
+		double[] eX,
+		double[] eY,
+		double[] eZ,
+		boolean isLeft,
+		boolean isLeg
+	) {
+		RagdollParticle neck = this.particles[NECK];
+		RagdollParticle pivot = this.particles[pivotIdx];
+		RagdollParticle tip = this.particles[tipIdx];
+		double u = this.pixelUnit;
+
+		double dx = tip.x - neck.x;
+		double dy = tip.y - neck.y;
+		double dz = tip.z - neck.z;
+
+		double xt = dx * eX[0] + dy * eX[1] + dz * eX[2];
+		double yt = dx * eY[0] + dy * eY[1] + dz * eY[2];
+		double zt = dx * eZ[0] + dy * eZ[1] + dz * eZ[2];
+
+		boolean modified = false;
+		if (!isLeg) {
+			// Arm vs Torso & Head exclusion:
+			// Torso spans x_t in [-4u, +4u], y_t in [0, 12u], z_t in [-2u, +2u].
+			// Left arm pivot is at (+5u, +2u, 0) with inner face 1u inward (at +4u when straight down).
+			double minOutwardX = (Math.abs(zt) < 4.4 * u) ? 5.4 * u : 4.8 * u;
+			if (isLeft) {
+				if (xt < minOutwardX) {
+					xt = minOutwardX;
+					modified = true;
+				}
+			} else {
+				if (xt > -minOutwardX) {
+					xt = -minOutwardX;
+					modified = true;
+				}
+			}
+			// Prevent arm from inverting upside-down above shoulder (which flips the +3u outer arm width into the head/neck)
+			double minArmY = 2.2 * u;
+			if (yt < minArmY) {
+				yt = minArmY;
+				modified = true;
+			}
+		} else {
+			// Leg vs Torso & Contralateral Leg exclusion:
+			// Hip pivot is at (+/-1.9u, +12u, 0). Keep foot below y_t >= 15.8u so the leg never folds upward into the torso.
+			double minLegY = 15.8 * u;
+			if (yt < minLegY) {
+				yt = minLegY;
+				modified = true;
+			}
+			// Prevent backward scorpion hyperextension into the lower back
+			double maxBackZ = 5.0 * u;
+			if (zt > maxBackZ) {
+				zt = maxBackZ;
+				modified = true;
+			}
+			// Keep each leg on its own side of the sagittal plane so left and right legs don't cross through each other
+			double minOutwardLegX = 1.9 * u;
+			if (isLeft) {
+				if (xt < minOutwardLegX) {
+					xt = minOutwardLegX;
+					modified = true;
+				}
+			} else {
+				if (xt > -minOutwardLegX) {
+					xt = -minOutwardLegX;
+					modified = true;
+				}
+			}
+		}
+
+		if (modified) {
+			// Re-normalize to exact limbLength from the joint pivot
+			double pvx = (pivot.x - neck.x) * eX[0] + (pivot.y - neck.y) * eX[1] + (pivot.z - neck.z) * eX[2];
+			double pvy = (pivot.x - neck.x) * eY[0] + (pivot.y - neck.y) * eY[1] + (pivot.z - neck.z) * eY[2];
+			double pvz = (pivot.x - neck.x) * eZ[0] + (pivot.y - neck.y) * eZ[1] + (pivot.z - neck.z) * eZ[2];
+
+			double relX = xt - pvx;
+			double relY = yt - pvy;
+			double relZ = zt - pvz;
+			double len = Math.sqrt(relX * relX + relY * relY + relZ * relZ);
+			if (len > 1.0e-8) {
+				double scale = limbLength / len;
+				xt = pvx + relX * scale;
+				yt = pvy + relY * scale;
+				zt = pvz + relZ * scale;
+			}
+			applyTorsoLocalPosition(neck, tip, xt, yt, zt, eX, eY, eZ);
+		}
+	}
+
+	private static void applyTorsoLocalPosition(
+		RagdollParticle neck,
+		RagdollParticle tip,
+		double xt,
+		double yt,
+		double zt,
+		double[] eX,
+		double[] eY,
+		double[] eZ
+	) {
+		double newX = neck.x + xt * eX[0] + yt * eY[0] + zt * eZ[0];
+		double newY = neck.y + xt * eX[1] + yt * eY[1] + zt * eZ[1];
+		double newZ = neck.z + xt * eX[2] + yt * eY[2] + zt * eZ[2];
+
+		double corrX = newX - tip.x;
+		double corrY = newY - tip.y;
+		double corrZ = newZ - tip.z;
+		double corrLenSq = corrX * corrX + corrY * corrY + corrZ * corrZ;
+
+		tip.x = newX;
+		tip.y = newY;
+		tip.z = newZ;
+
+		// Damp velocity component moving against the collision normal
+		if (corrLenSq > 1.0e-12) {
+			double vx = tip.x - tip.prevX;
+			double vy = tip.y - tip.prevY;
+			double vz = tip.z - tip.prevZ;
+			double vDotCorr = vx * corrX + vy * corrY + vz * corrZ;
+			if (vDotCorr < 0.0) {
+				double proj = vDotCorr / corrLenSq;
+				tip.prevX += corrX * proj;
+				tip.prevY += corrY * proj;
+				tip.prevZ += corrZ * proj;
+			}
+		}
+	}
+
+	/**
+	 * Resolves 3D capsule-vs-capsule collisions between all limb segments so arms and legs
+	 * never clip through each other or the head.
+	 */
+	private void solveLimbCapsuleCollisions() {
+		double u = this.pixelUnit;
+		double limbDiameter = 4.2 * u;
+		double headLimbRadiusSum = 5.6 * u;
+
+		// Arm vs ipsilateral & contralateral Leg capsules
+		solveCapsuleSegmentCollision(LEFT_SHOULDER, LEFT_HAND, LEFT_HIP, LEFT_FOOT, limbDiameter);
+		solveCapsuleSegmentCollision(RIGHT_SHOULDER, RIGHT_HAND, RIGHT_HIP, RIGHT_FOOT, limbDiameter);
+		solveCapsuleSegmentCollision(LEFT_SHOULDER, LEFT_HAND, RIGHT_HIP, RIGHT_FOOT, limbDiameter);
+		solveCapsuleSegmentCollision(RIGHT_SHOULDER, RIGHT_HAND, LEFT_HIP, LEFT_FOOT, limbDiameter);
+
+		// Left Arm vs Right Arm & Left Leg vs Right Leg
+		solveCapsuleSegmentCollision(LEFT_SHOULDER, LEFT_HAND, RIGHT_SHOULDER, RIGHT_HAND, limbDiameter);
+		solveCapsuleSegmentCollision(LEFT_HIP, LEFT_FOOT, RIGHT_HIP, RIGHT_FOOT, 3.8 * u);
+
+		// Arms vs Head
+		solveCapsuleSegmentCollision(LEFT_SHOULDER, LEFT_HAND, NECK, HEAD_TOP, headLimbRadiusSum);
+		solveCapsuleSegmentCollision(RIGHT_SHOULDER, RIGHT_HAND, NECK, HEAD_TOP, headLimbRadiusSum);
+	}
+
+	private void solveCapsuleSegmentCollision(int p0Idx, int p1Idx, int q0Idx, int q1Idx, double minDist) {
+		RagdollParticle p0 = this.particles[p0Idx];
+		RagdollParticle p1 = this.particles[p1Idx];
+		RagdollParticle q0 = this.particles[q0Idx];
+		RagdollParticle q1 = this.particles[q1Idx];
+
+		double ux = p1.x - p0.x, uy = p1.y - p0.y, uz = p1.z - p0.z;
+		double vx = q1.x - q0.x, vy = q1.y - q0.y, vz = q1.z - q0.z;
+		double wx = p0.x - q0.x, wy = p0.y - q0.y, wz = p0.z - q0.z;
+
+		double a = ux * ux + uy * uy + uz * uz;
+		double b = ux * vx + uy * vy + uz * vz;
+		double c = vx * vx + vy * vy + vz * vz;
+		double d = ux * wx + uy * wy + uz * wz;
+		double e = vx * wx + vy * wy + vz * wz;
+		double denom = a * c - b * b;
+
+		double sN, sD = denom;
+		double tN, tD = denom;
+
+		if (denom < 1.0e-9) {
+			sN = 0.0;
+			sD = 1.0;
+			tN = e;
+			tD = c;
+		} else {
+			sN = (b * e - c * d);
+			tN = (a * e - b * d);
+			if (sN < 0.0) {
+				sN = 0.0;
+				tN = e;
+				tD = c;
+			} else if (sN > sD) {
+				sN = sD;
+				tN = e + b;
+				tD = c;
+			}
+		}
+
+		if (tN < 0.0) {
+			tN = 0.0;
+			if (-d < 0.0) {
+				sN = 0.0;
+			} else if (-d > a) {
+				sN = sD;
+			} else {
+				sN = -d;
+				sD = a;
+			}
+		} else if (tN > tD) {
+			tN = tD;
+			if ((-d + b) < 0.0) {
+				sN = 0.0;
+			} else if ((-d + b) > a) {
+				sN = sD;
+			} else {
+				sN = (-d + b);
+				sD = a;
+			}
+		}
+
+		double s = Math.abs(sN) < 1.0e-9 ? 0.0 : sN / sD;
+		double t = Math.abs(tN) < 1.0e-9 ? 0.0 : tN / tD;
+
+		// Only separate along the movable distal portions of the segments
+		if (s < 0.15 && t < 0.15) {
+			return;
+		}
+
+		double cpx = p0.x + s * ux;
+		double cpy = p0.y + s * uy;
+		double cpz = p0.z + s * uz;
+		double cqx = q0.x + t * vx;
+		double cqy = q0.y + t * vy;
+		double cqz = q0.z + t * vz;
+
+		double dx = cpx - cqx;
+		double dy = cpy - cqy;
+		double dz = cpz - cqz;
+		double distSq = dx * dx + dy * dy + dz * dz;
+
+		if (distSq < minDist * minDist && distSq > 1.0e-12) {
+			double dist = Math.sqrt(distSq);
+			double pen = minDist - dist;
+			double nx = dx / dist;
+			double ny = dy / dist;
+			double nz = dz / dist;
+
+			double wp = Math.max(0.15, s) * p1.invMass;
+			double wq = Math.max(0.15, t) * q1.invMass;
+			double wSum = wp + wq;
+			if (wSum > 1.0e-9) {
+				double pushP = pen * (wp / wSum);
+				double pushQ = pen * (wq / wSum);
+				p1.x += nx * pushP;
+				p1.y += ny * pushP;
+				p1.z += nz * pushP;
+				q1.x -= nx * pushQ;
+				q1.y -= ny * pushQ;
+				q1.z -= nz * pushQ;
+			}
 		}
 	}
 
@@ -511,17 +867,39 @@ public final class RagdollSkeleton {
 			headEx, headEy, headEz
 		);
 
+		double u = this.pixelUnit;
+		double[] leftShoulderSocket = {
+			pos[NECK][0] + 5.0 * u * torsoEx[0] + 2.0 * u * torsoEy[0],
+			pos[NECK][1] + 5.0 * u * torsoEx[1] + 2.0 * u * torsoEy[1],
+			pos[NECK][2] + 5.0 * u * torsoEx[2] + 2.0 * u * torsoEy[2]
+		};
+		double[] rightShoulderSocket = {
+			pos[NECK][0] - 5.0 * u * torsoEx[0] + 2.0 * u * torsoEy[0],
+			pos[NECK][1] - 5.0 * u * torsoEx[1] + 2.0 * u * torsoEy[1],
+			pos[NECK][2] - 5.0 * u * torsoEx[2] + 2.0 * u * torsoEy[2]
+		};
+		double[] leftHipSocket = {
+			pos[NECK][0] + 1.9 * u * torsoEx[0] + 12.0 * u * torsoEy[0],
+			pos[NECK][1] + 1.9 * u * torsoEx[1] + 12.0 * u * torsoEy[1],
+			pos[NECK][2] + 1.9 * u * torsoEx[2] + 12.0 * u * torsoEy[2]
+		};
+		double[] rightHipSocket = {
+			pos[NECK][0] - 1.9 * u * torsoEx[0] + 12.0 * u * torsoEy[0],
+			pos[NECK][1] - 1.9 * u * torsoEx[1] + 12.0 * u * torsoEy[1],
+			pos[NECK][2] - 1.9 * u * torsoEx[2] + 12.0 * u * torsoEy[2]
+		};
+
 		RagdollPose.LimbTransform leftArmTransform = computeLimbTransform(
-			pos[LEFT_SHOULDER], pos[LEFT_HAND], rootX, rootY, rootZ, torsoEx, torsoEy, torsoEz
+			leftShoulderSocket, pos[LEFT_HAND], rootX, rootY, rootZ, torsoEx, torsoEy, torsoEz
 		);
 		RagdollPose.LimbTransform rightArmTransform = computeLimbTransform(
-			pos[RIGHT_SHOULDER], pos[RIGHT_HAND], rootX, rootY, rootZ, torsoEx, torsoEy, torsoEz
+			rightShoulderSocket, pos[RIGHT_HAND], rootX, rootY, rootZ, torsoEx, torsoEy, torsoEz
 		);
 		RagdollPose.LimbTransform leftLegTransform = computeLimbTransform(
-			pos[LEFT_HIP], pos[LEFT_FOOT], rootX, rootY, rootZ, torsoEx, torsoEy, torsoEz
+			leftHipSocket, pos[LEFT_FOOT], rootX, rootY, rootZ, torsoEx, torsoEy, torsoEz
 		);
 		RagdollPose.LimbTransform rightLegTransform = computeLimbTransform(
-			pos[RIGHT_HIP], pos[RIGHT_FOOT], rootX, rootY, rootZ, torsoEx, torsoEy, torsoEz
+			rightHipSocket, pos[RIGHT_FOOT], rootX, rootY, rootZ, torsoEx, torsoEy, torsoEz
 		);
 
 		return new RagdollPose(
