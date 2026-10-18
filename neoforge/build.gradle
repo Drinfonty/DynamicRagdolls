@@ -1,0 +1,156 @@
+plugins {
+	id 'net.neoforged.moddev' version '2.0.143'
+	id 'com.modrinth.minotaur'
+	id 'net.darkhax.curseforgegradle'
+}
+
+// -PtestJar must load the mod from the packaged jar and nothing else.
+def isTestJar = project.hasProperty('testJar')
+
+neoForge {
+	version = "${project.neoforge_version}"
+
+	runs {
+		client {
+			client()
+
+			if (isTestJar) {
+				gameDirectory = project.file('run-testjar')
+			} else {
+				systemProperty 'ragdolls.debug', 'true'
+			}
+
+			if (project.hasProperty('quickPlaySingleplayer')) {
+				programArgument '--quickPlaySingleplayer'
+				programArgument project.property('quickPlaySingleplayer').toString()
+			}
+		}
+	}
+
+	if (!isTestJar) {
+		mods {
+			ragdolls {
+				sourceSet sourceSets.main
+				sourceSet project(":common").sourceSets.main
+			}
+		}
+	}
+}
+
+tasks.register('installTestJar', Copy) {
+	from tasks.named('jar')
+	into layout.projectDirectory.dir('run-testjar/mods')
+
+	doFirst {
+		delete fileTree(layout.projectDirectory.dir('run-testjar/mods')) {
+			include 'ragdolls-*.jar'
+		}
+	}
+}
+
+dependencies {
+	implementation project(":common")
+}
+
+processResources {
+	def modVersion = project.mod_version
+	def minecraftDependencyMaven = project.minecraft_dependency_maven
+	def neoforgeDependency = project.neoforge_dependency
+	inputs.property "modVersion", modVersion
+	inputs.property "minecraftDependencyMaven", minecraftDependencyMaven
+	inputs.property "neoforgeDependency", neoforgeDependency
+
+	filesMatching("META-INF/neoforge.mods.toml") {
+		expand "modVersion": modVersion,
+				"minecraftDependencyMaven": minecraftDependencyMaven,
+				"neoforgeDependency": neoforgeDependency
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = Integer.parseInt(project.java_version)
+}
+
+java {
+	withSourcesJar()
+
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(Integer.parseInt(project.java_version))
+	}
+}
+
+jar {
+	archiveFileName = "ragdolls-${project.mod_version}-${project.mc_version_suffix}-neoforge.jar"
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from project(":common").sourceSets.main.output
+
+	from(rootProject.file("LICENSE")) {
+		rename { "${it}_$projectName"}
+	}
+}
+
+tasks.register('copyJarToRelease', Copy) {
+	from tasks.named('jar')
+	into "${project.rootDir}/release"
+
+	mustRunAfter tasks.named('jar')
+}
+
+tasks.named('build') {
+	finalizedBy('copyJarToRelease')
+}
+
+afterEvaluate {
+	tasks.named('runClient') {
+		if (isTestJar) {
+			dependsOn(tasks.named('installTestJar'))
+			setClasspath(classpath.filter { File file ->
+				!file.path.contains("common/build/classes") &&
+				!file.path.contains("common/build/resources") &&
+				!file.path.contains("neoforge/build/classes") &&
+				!file.path.contains("neoforge/build/resources")
+			})
+		}
+	}
+}
+
+modrinth {
+	token = rootProject.getModrinthToken()
+	projectId = project.modrinth_project_id
+
+	debugMode = project.hasProperty('publishDebug')
+	versionNumber = "${project.mod_version}-${project.mc_version_suffix}-neoforge"
+	versionName = "Ragdolls ${project.mod_version} (NeoForge)"
+	versionType = "release"
+	uploadFile = layout.buildDirectory.file("libs/ragdolls-${project.mod_version}-${project.mc_version_suffix}-neoforge.jar")
+	gameVersions = project.modrinth_game_versions.split(",") as List
+	loaders = ["neoforge"]
+
+	def notesFile = rootProject.file("release/release-note-${project.mod_version}.md")
+	if (notesFile.exists()) {
+		changelog = notesFile.text
+	}
+}
+
+tasks.register("curseforge", net.darkhax.curseforgegradle.TaskPublishCurseForge) {
+	apiToken = rootProject.getCurseForgeToken()
+
+	debugMode = project.hasProperty('publishDebug')
+
+	def mainFile = upload(project.curseforge_project_id, tasks.named('jar'))
+	mainFile.displayName = "Ragdolls ${project.mod_version} (NeoForge)"
+	mainFile.releaseType = "release"
+	mainFile.changelogType = "markdown"
+
+	project.curseforge_game_versions.split(",").each {
+		mainFile.addGameVersion(it)
+	}
+	mainFile.addModLoader("NeoForge")
+
+	def notesFile = rootProject.file("release/release-note-${project.mod_version}.md")
+	if (notesFile.exists()) {
+		mainFile.changelog = notesFile.text
+	}
+}

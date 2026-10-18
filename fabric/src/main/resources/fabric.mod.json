@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "ragdolls",
+	"version": "${version}",
+	"name": "Ragdolls",
+	"description": "A client-side physics-based ragdoll mod for players and humanoid entities upon death.",
+	"authors": [
+		"Drinfonty"
+	],
+	"contact": {
+		"homepage": "https://github.com/Drinfonty/Ragdolls"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/ragdolls/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.drinfonty.ragdolls.fabric.RagdollsFabric"
+		],
+		"client": [
+			"com.drinfonty.ragdolls.fabric.RagdollsFabricClient"
+		],
+		"modmenu": [
+			"com.drinfonty.ragdolls.client.integration.ModMenuIntegration"
+		]
+	},
+	"mixins": [
+		"ragdolls.mixins.json",
+		{
+			"config": "ragdolls.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": "${fabricLoaderDependency}",
+		"minecraft": "${minecraftDependency}",
+		"java": ">=${javaVersion}",
+		"fabric-api": "*"
+	}
+}

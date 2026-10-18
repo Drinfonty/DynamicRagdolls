@@ -1,0 +1,141 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'com.modrinth.minotaur'
+	id 'net.darkhax.curseforgegradle'
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"ragdolls" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+			sourceSet project(":common").sourceSets.main
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	compileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
+
+	implementation project(":common")
+}
+
+processResources {
+	def version = project.version
+	def minecraftDependency = project.minecraft_dependency
+	def fabricLoaderDependency = project.fabric_loader_dependency
+	def javaVersion = project.java_version
+	inputs.property "version", version
+	inputs.property "minecraftDependency", minecraftDependency
+	inputs.property "fabricLoaderDependency", fabricLoaderDependency
+	inputs.property "javaVersion", javaVersion
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version,
+				"minecraftDependency": minecraftDependency,
+				"fabricLoaderDependency": fabricLoaderDependency,
+				"javaVersion": javaVersion
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = Integer.parseInt(project.java_version)
+}
+
+java {
+	withSourcesJar()
+
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(Integer.parseInt(project.java_version))
+	}
+}
+
+jar {
+	archiveFileName = "ragdolls-${project.mod_version}-${project.mc_version_suffix}-fabric.jar"
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from project(":common").sourceSets.main.output
+
+	from(rootProject.file("LICENSE")) {
+		rename { "${it}_$projectName"}
+	}
+}
+
+tasks.register('copyJarToRelease', Copy) {
+	from tasks.named('jar')
+	into "${project.rootDir}/release"
+
+	mustRunAfter tasks.named('jar')
+}
+
+tasks.named('build') {
+	finalizedBy('copyJarToRelease')
+}
+
+afterEvaluate {
+	tasks.named('runClient') {
+		if (project.hasProperty('testJar')) {
+			dependsOn(tasks.named('jar'))
+			setClasspath(classpath.filter { File file ->
+				!file.path.contains("common/build/classes") &&
+				!file.path.contains("common/build/resources") &&
+				!file.path.contains("fabric/build/classes") &&
+				!file.path.contains("fabric/build/resources")
+			})
+			classpath.from(tasks.named('jar'))
+		} else {
+			systemProperty 'ragdolls.debug', 'true'
+		}
+	}
+}
+
+modrinth {
+	token = rootProject.getModrinthToken()
+	projectId = project.modrinth_project_id
+
+	debugMode = project.hasProperty('publishDebug')
+	versionNumber = "${project.mod_version}-${project.mc_version_suffix}-fabric"
+	versionName = "Ragdolls ${project.mod_version} (Fabric)"
+	versionType = "release"
+	uploadFile = layout.buildDirectory.file("libs/ragdolls-${project.mod_version}-${project.mc_version_suffix}-fabric.jar")
+	gameVersions = project.modrinth_game_versions.split(",") as List
+	loaders = ["fabric"]
+
+	def notesFile = rootProject.file("release/release-note-${project.mod_version}.md")
+	if (notesFile.exists()) {
+		changelog = notesFile.text
+	}
+
+	dependencies {
+		required.project "P7dR8mSH" // Fabric API
+	}
+}
+
+tasks.register("curseforge", net.darkhax.curseforgegradle.TaskPublishCurseForge) {
+	apiToken = rootProject.getCurseForgeToken()
+
+	debugMode = project.hasProperty('publishDebug')
+
+	def mainFile = upload(project.curseforge_project_id, tasks.named('jar'))
+	mainFile.displayName = "Ragdolls ${project.mod_version} (Fabric)"
+	mainFile.releaseType = "release"
+	mainFile.changelogType = "markdown"
+
+	project.curseforge_game_versions.split(",").each {
+		mainFile.addGameVersion(it)
+	}
+	mainFile.addModLoader("Fabric")
+
+	def notesFile = rootProject.file("release/release-note-${project.mod_version}.md")
+	if (notesFile.exists()) {
+		mainFile.changelog = notesFile.text
+	}
+
+	mainFile.addRequirement("fabric-api")
+}

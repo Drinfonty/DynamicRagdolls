@@ -1,0 +1,22 @@
+{
+	"required": true,
+	"package": "com.drinfonty.ragdolls.client.mixin",
+	"compatibilityLevel": "${mixinCompatLevel}",
+	"client": [
+		"EntityRenderDispatcherMixin",
+		"HumanoidModelMixin",
+		"HumanoidRenderStateMixin",
+		"LevelRendererMixin",
+		"LivingEntityMixin",
+		"LivingEntityRendererMixin",
+		"MinecraftClientSmokeTestMixin",
+		"ModelFeatureRendererMixin",
+		"PlayerSpawnSmokeTestMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
