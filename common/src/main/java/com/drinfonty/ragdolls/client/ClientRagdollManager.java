@@ -172,6 +172,7 @@ public final class ClientRagdollManager {
 		float coneScale = config.getJointConeScale();
 		int solverIterations = config.getSolverIterations();
 		boolean groundDust = config.groundDustParticles;
+		boolean hitSounds = config.collisionSounds;
 
 		Iterator<Map.Entry<Integer, RagdollInstance>> it = this.ragdollsByEntityId.entrySet().iterator();
 		while (it.hasNext()) {
@@ -188,7 +189,8 @@ public final class ClientRagdollManager {
 				buoyancy,
 				coneScale,
 				solverIterations,
-				groundDust
+				groundDust,
+				hitSounds
 			);
 		}
 	}

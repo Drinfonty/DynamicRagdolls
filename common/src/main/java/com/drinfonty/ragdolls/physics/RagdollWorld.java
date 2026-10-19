@@ -36,4 +36,14 @@ public interface RagdollWorld {
 	 * @param intensity >= 1.0 for landing bounce, < 1.0 for ground sliding/scraping
 	 */
 	default void spawnGroundDust(double x, double y, double z, double vx, double vy, double vz, float intensity) {}
+
+	/**
+	 * Plays a block landing, thumping, or step sound upon ragdoll collision impact.
+	 *
+	 * @param x world X position of collision
+	 * @param y world Y position of collision
+	 * @param z world Z position of collision
+	 * @param impactSpeed normal impact speed (positive)
+	 */
+	default void playGroundImpactSound(double x, double y, double z, double impactSpeed) {}
 }

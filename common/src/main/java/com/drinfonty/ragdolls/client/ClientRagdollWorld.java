@@ -137,4 +137,49 @@ public final class ClientRagdollWorld implements RagdollWorld {
 			this.level.addParticle(blockParticle, px, py, pz, pvx, pvy, pvz);
 		}
 	}
+
+	@Override
+	public void playGroundImpactSound(double x, double y, double z, double impactSpeed) {
+		BlockPos groundPos = BlockPos.containing(x, y - 0.2, z);
+		if (!this.level.hasChunkAt(groundPos)) {
+			return;
+		}
+		BlockState state = this.level.getBlockState(groundPos);
+		if (state.isAir()) {
+			groundPos = groundPos.below();
+			if (!this.level.hasChunkAt(groundPos)) {
+				return;
+			}
+			state = this.level.getBlockState(groundPos);
+			if (state.isAir()) {
+				return;
+			}
+		}
+
+		net.minecraft.world.level.block.SoundType soundType = state.getSoundType();
+		net.minecraft.sounds.SoundEvent soundEvent;
+		float volume;
+		float pitch;
+
+		if (impactSpeed >= 0.12) {
+			// Hard landing thud
+			soundEvent = soundType.getFallSound();
+			volume = Math.min(1.0f, (float) (impactSpeed * 3.5f)) * soundType.getVolume() * 0.65f;
+			pitch = soundType.getPitch() * (0.85f + (float) Math.random() * 0.2f);
+		} else {
+			// Softer contact / footstep thump
+			soundEvent = soundType.getStepSound();
+			volume = Math.min(0.7f, (float) (impactSpeed * 4.0f)) * soundType.getVolume() * 0.5f;
+			pitch = soundType.getPitch() * (0.95f + (float) Math.random() * 0.15f);
+		}
+
+		this.level.playLocalSound(
+			x, y, z,
+			soundEvent,
+			net.minecraft.sounds.SoundSource.BLOCKS,
+			Math.max(0.1f, volume),
+			pitch,
+			false
+		);
+	}
 }

@@ -38,6 +38,7 @@ public final class RagdollSkeleton {
 
 	private int settledTicks = 0;
 	private boolean settled = false;
+	private int soundCooldown = 0;
 
 	public RagdollSkeleton(
 		double originX,
@@ -154,7 +155,7 @@ public final class RagdollSkeleton {
 	}
 
 	/**
-	 * Advances the ragdoll physics simulation by one client tick (20 Hz) with ground dust disabled.
+	 * Advances the ragdoll physics simulation by one client tick (20 Hz) with ground dust and collision sounds disabled.
 	 */
 	public void step(
 		RagdollWorld world,
@@ -165,7 +166,23 @@ public final class RagdollSkeleton {
 		float jointConeScale,
 		int solverIterations
 	) {
-		step(world, gravityScale, bounciness, groundFriction, waterBuoyancy, jointConeScale, solverIterations, false);
+		step(world, gravityScale, bounciness, groundFriction, waterBuoyancy, jointConeScale, solverIterations, false, false);
+	}
+
+	/**
+	 * Advances the ragdoll physics simulation by one client tick (20 Hz) with collision sounds disabled.
+	 */
+	public void step(
+		RagdollWorld world,
+		float gravityScale,
+		float bounciness,
+		float groundFriction,
+		boolean waterBuoyancy,
+		float jointConeScale,
+		int solverIterations,
+		boolean groundDustParticles
+	) {
+		step(world, gravityScale, bounciness, groundFriction, waterBuoyancy, jointConeScale, solverIterations, groundDustParticles, false);
 	}
 
 	/**
@@ -179,8 +196,12 @@ public final class RagdollSkeleton {
 		boolean waterBuoyancy,
 		float jointConeScale,
 		int solverIterations,
-		boolean groundDustParticles
+		boolean groundDustParticles,
+		boolean collisionSounds
 	) {
+		if (this.soundCooldown > 0) {
+			this.soundCooldown--;
+		}
 		for (RagdollParticle p : this.particles) {
 			p.snapshotRenderPosition();
 		}
@@ -259,11 +280,24 @@ public final class RagdollSkeleton {
 				solveLimbCapsuleCollisions();
 
 				boolean spawnDust = groundDustParticles && iter == 0;
+				boolean canPlaySound = collisionSounds && this.soundCooldown == 0 && iter == 0;
 				for (int i = 0; i < PARTICLE_COUNT; i++) {
 					if (i == CHEST_FRONT) {
 						continue;
 					}
-					resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction, world, spawnDust);
+					boolean played = resolveParticleCollision(
+						this.particles[i],
+						worldBoxes,
+						bounciness,
+						groundFriction,
+						world,
+						spawnDust,
+						canPlaySound
+					);
+					if (played) {
+						this.soundCooldown = 4; // 200ms throttle between impacts
+						canPlaySound = false;
+					}
 				}
 			}
 		}
@@ -283,7 +317,7 @@ public final class RagdollSkeleton {
 			if (i == CHEST_FRONT) {
 				continue;
 			}
-			resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction, world, false);
+			resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction, world, false, false);
 		}
 		solveTorsoLimbCollisions(torsoEx, torsoEy, torsoEz);
 		solveLimbCapsuleCollisions();
@@ -720,14 +754,16 @@ public final class RagdollSkeleton {
 		}
 	}
 
-	private static void resolveParticleCollision(
+	private static boolean resolveParticleCollision(
 		RagdollParticle p,
 		List<RagdollWorld.Box> boxes,
 		float bounciness,
 		float groundFriction,
 		RagdollWorld world,
-		boolean spawnDust
+		boolean spawnDust,
+		boolean canPlaySound
 	) {
+		boolean soundPlayed = false;
 		double r = p.radius;
 		for (int i = 0, size = boxes.size(); i < size; i++) {
 			RagdollWorld.Box box = boxes.get(i);
@@ -810,15 +846,22 @@ public final class RagdollSkeleton {
 				double vtY = vy - vn * ny;
 				double vtZ = vz - vn * nz;
 
-				if (spawnDust && world != null && ny > 0.5) {
-					if (vn < -0.04) {
-						float intensity = (float) Math.min(3.0, (-vn) * 18.0);
-						world.spawnGroundDust(p.x, p.y - r, p.z, vx, vy, vz, intensity);
-					} else {
-						double speedVtSq = vtX * vtX + vtZ * vtZ;
-						if (speedVtSq > 0.02 * 0.02 && Math.random() < 0.25) {
-							world.spawnGroundDust(p.x, p.y - r, p.z, vtX, 0.0, vtZ, 0.5f);
+				if (world != null) {
+					if (spawnDust && ny > 0.5) {
+						if (vn < -0.04) {
+							float intensity = (float) Math.min(3.0, (-vn) * 18.0);
+							world.spawnGroundDust(p.x, p.y - r, p.z, vx, vy, vz, intensity);
+						} else {
+							double speedVtSq = vtX * vtX + vtZ * vtZ;
+							if (speedVtSq > 0.02 * 0.02 && Math.random() < 0.25) {
+								world.spawnGroundDust(p.x, p.y - r, p.z, vtX, 0.0, vtZ, 0.5f);
+							}
 						}
+					}
+
+					if (canPlaySound && !soundPlayed && vn < -0.055) {
+						world.playGroundImpactSound(p.x, p.y - r, p.z, -vn);
+						soundPlayed = true;
 					}
 				}
 
@@ -833,6 +876,7 @@ public final class RagdollSkeleton {
 				p.prevZ = p.z - newVz;
 			}
 		}
+		return soundPlayed;
 	}
 
 	/**

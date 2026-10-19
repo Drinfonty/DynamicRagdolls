@@ -279,4 +279,46 @@ class RagdollPhysicsTest {
 		assertTrue(dustCount[0] > 0, "Expected dust particles to be emitted on ground landing and sliding");
 		assertTrue(maxIntensity[0] >= 1.0f, "Expected at least one ground impact bounce with intensity >= 1.0, got " + maxIntensity[0]);
 	}
+
+	@Test
+	void testGroundImpactSoundEmission() {
+		final int[] soundCount = new int[1];
+		final double[] maxSpeed = new double[1];
+
+		RagdollWorld soundTrackingWorld = new RagdollWorld() {
+			@Override
+			public List<Box> getCollisionBoxes(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+				if (minY <= 0.0 && maxY >= -1.0) {
+					return List.of(new Box(-100.0, -1.0, -100.0, 100.0, 0.0, 100.0));
+				}
+				return List.of();
+			}
+
+			@Override
+			public boolean isWater(double x, double y, double z) {
+				return false;
+			}
+
+			@Override
+			public void playGroundImpactSound(double x, double y, double z, double impactSpeed) {
+				soundCount[0]++;
+				if (impactSpeed > maxSpeed[0]) {
+					maxSpeed[0] = impactSpeed;
+				}
+			}
+		};
+
+		// Drop skeleton from 1.5 blocks high to hit the ground
+		RagdollSkeleton skeleton = new RagdollSkeleton(
+			0.0, 1.5, 0.0, 0.0f, 0.0f, 0.9375,
+			0.0, 0.0, 0.0, 0.0, -0.25, 0.0
+		);
+
+		for (int tick = 0; tick < 25; tick++) {
+			skeleton.step(soundTrackingWorld, 1.0f, 0.25f, 0.80f, true, 1.0f, 6, true, true);
+		}
+
+		assertTrue(soundCount[0] > 0, "Expected at least one impact sound on landing");
+		assertTrue(maxSpeed[0] >= 0.055, "Expected impact speed >= 0.055, got " + maxSpeed[0]);
+	}
 }

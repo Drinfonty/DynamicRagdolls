@@ -9,19 +9,19 @@ class RagdollsConfigTest {
 	void testDefaultsAndReset() {
 		RagdollsConfig config = new RagdollsConfig();
 		assertTrue(config.ragdollsEnabled);
-		assertEquals("PlayersOnly", config.entityScope);
-		assertFalse(config.isHumanoidsEnabled());
+		assertEquals("Humanoids", config.entityScope);
+		assertTrue(config.isHumanoidsEnabled());
 		assertEquals("Natural", config.jointStiffness);
 		assertEquals(15, config.ragdollLifetimeSeconds);
 
-		config.entityScope = "Humanoids";
+		config.entityScope = "PlayersOnly";
 		config.jointStiffness = "Loose";
 		config.ragdollLifetimeSeconds = 45;
-		assertTrue(config.isHumanoidsEnabled());
+		assertFalse(config.isHumanoidsEnabled());
 		assertTrue(config.getJointConeScale() > 1.0f);
 
 		config.resetToDefaults();
-		assertEquals("PlayersOnly", config.entityScope);
+		assertEquals("Humanoids", config.entityScope);
 		assertEquals("Natural", config.jointStiffness);
 		assertEquals(15, config.ragdollLifetimeSeconds);
 	}

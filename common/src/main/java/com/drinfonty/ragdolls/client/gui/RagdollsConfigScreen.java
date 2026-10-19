@@ -94,9 +94,18 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		).bounds(leftX, startY + 75, colWidth, buttonHeight).build());
 
-		// Row 3 Right: Slider for Ragdoll Lifetime (1s - 60s)
+		// Row 3 Right: Toggle Collision Sounds
+		this.addRenderableWidget(Button.builder(
+			getSoundsMessage(config),
+			btn -> {
+				config.collisionSounds = !config.collisionSounds;
+				btn.setMessage(getSoundsMessage(config));
+			}
+		).bounds(rightX, startY + 75, colWidth, buttonHeight).build());
+
+		// Row 4 Left: Slider for Ragdoll Lifetime (1s - 60s)
 		this.addRenderableWidget(new AbstractSliderButton(
-			rightX, startY + 75, colWidth, buttonHeight,
+			leftX, startY + 100, colWidth, buttonHeight,
 			Component.empty(),
 			(double) (config.ragdollLifetimeSeconds - 1) / 59.0
 		) {
@@ -115,9 +124,9 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		});
 
-		// Row 4 Left: Slider for Knockback Force (0.2x - 3.0x)
+		// Row 4 Right: Slider for Knockback Force (0.2x - 3.0x)
 		this.addRenderableWidget(new AbstractSliderButton(
-			leftX, startY + 100, colWidth, buttonHeight,
+			rightX, startY + 100, colWidth, buttonHeight,
 			Component.empty(),
 			(double) (config.knockbackMultiplier - 0.2f) / 2.8f
 		) {
@@ -265,6 +274,10 @@ public class RagdollsConfigScreen extends Screen {
 
 	private static Component getDustMessage(RagdollsConfig config) {
 		return Component.literal("Ground Dust: " + (config.groundDustParticles ? "ON" : "OFF"));
+	}
+
+	private static Component getSoundsMessage(RagdollsConfig config) {
+		return Component.literal("Hit Sounds: " + (config.collisionSounds ? "ON" : "OFF"));
 	}
 
 	@Override

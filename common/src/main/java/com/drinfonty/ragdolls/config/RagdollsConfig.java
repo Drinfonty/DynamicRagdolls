@@ -14,12 +14,13 @@ public class RagdollsConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	public boolean ragdollsEnabled = true;
-	public String entityScope = "PlayersOnly"; // PlayersOnly, Humanoids
+	public String entityScope = "Humanoids"; // PlayersOnly, Humanoids
 	public String jointStiffness = "Natural"; // Loose, Natural, Stiff
 	public boolean waterBuoyancy = true;
 	public boolean renderArmorAndItems = true;
 	public boolean deathSmokeParticles = false;
 	public boolean groundDustParticles = true;
+	public boolean collisionSounds = true;
 	public int ragdollLifetimeSeconds = 15; // Range: 1 to 60 seconds
 	public int maxActiveRagdolls = 32; // Range: 4 to 100
 	public float knockbackMultiplier = 1.0f; // Range: 0.2 to 3.0
@@ -50,6 +51,7 @@ public class RagdollsConfig {
 					if (obj.has("renderArmorAndItems")) config.renderArmorAndItems = obj.get("renderArmorAndItems").getAsBoolean();
 					if (obj.has("deathSmokeParticles")) config.deathSmokeParticles = obj.get("deathSmokeParticles").getAsBoolean();
 					if (obj.has("groundDustParticles")) config.groundDustParticles = obj.get("groundDustParticles").getAsBoolean();
+					if (obj.has("collisionSounds")) config.collisionSounds = obj.get("collisionSounds").getAsBoolean();
 					if (obj.has("ragdollLifetimeSeconds")) config.ragdollLifetimeSeconds = obj.get("ragdollLifetimeSeconds").getAsInt();
 					if (obj.has("maxActiveRagdolls")) config.maxActiveRagdolls = obj.get("maxActiveRagdolls").getAsInt();
 					if (obj.has("knockbackMultiplier")) config.knockbackMultiplier = obj.get("knockbackMultiplier").getAsFloat();
@@ -64,7 +66,7 @@ public class RagdollsConfig {
 
 		// Fallbacks & validation
 		if (config.entityScope == null || (!config.entityScope.equals("PlayersOnly") && !config.entityScope.equals("Humanoids"))) {
-			config.entityScope = "PlayersOnly";
+			config.entityScope = "Humanoids";
 		}
 		if (config.jointStiffness == null || (!config.jointStiffness.equals("Loose") && !config.jointStiffness.equals("Natural") && !config.jointStiffness.equals("Stiff"))) {
 			config.jointStiffness = "Natural";
@@ -96,12 +98,13 @@ public class RagdollsConfig {
 
 	public void resetToDefaults() {
 		this.ragdollsEnabled = true;
-		this.entityScope = "PlayersOnly";
+		this.entityScope = "Humanoids";
 		this.jointStiffness = "Natural";
 		this.waterBuoyancy = true;
 		this.renderArmorAndItems = true;
 		this.deathSmokeParticles = false;
 		this.groundDustParticles = true;
+		this.collisionSounds = true;
 		this.ragdollLifetimeSeconds = 15;
 		this.maxActiveRagdolls = 32;
 		this.knockbackMultiplier = 1.0f;
