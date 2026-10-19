@@ -85,9 +85,18 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		).bounds(rightX, startY + 50, colWidth, buttonHeight).build());
 
-		// Row 3 Left: Slider for Ragdoll Lifetime (1s - 60s)
+		// Row 3 Left: Toggle Ground Dust Particles
+		this.addRenderableWidget(Button.builder(
+			getDustMessage(config),
+			btn -> {
+				config.groundDustParticles = !config.groundDustParticles;
+				btn.setMessage(getDustMessage(config));
+			}
+		).bounds(leftX, startY + 75, colWidth, buttonHeight).build());
+
+		// Row 3 Right: Slider for Ragdoll Lifetime (1s - 60s)
 		this.addRenderableWidget(new AbstractSliderButton(
-			leftX, startY + 75, colWidth, buttonHeight,
+			rightX, startY + 75, colWidth, buttonHeight,
 			Component.empty(),
 			(double) (config.ragdollLifetimeSeconds - 1) / 59.0
 		) {
@@ -106,9 +115,9 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		});
 
-		// Row 3 Right: Slider for Knockback Force (0.2x - 3.0x)
+		// Row 4 Left: Slider for Knockback Force (0.2x - 3.0x)
 		this.addRenderableWidget(new AbstractSliderButton(
-			rightX, startY + 75, colWidth, buttonHeight,
+			leftX, startY + 100, colWidth, buttonHeight,
 			Component.empty(),
 			(double) (config.knockbackMultiplier - 0.2f) / 2.8f
 		) {
@@ -127,9 +136,9 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		});
 
-		// Row 4 Left: Slider for Gravity Scale (0.2x - 2.0x)
+		// Row 4 Right: Slider for Gravity Scale (0.2x - 2.0x)
 		this.addRenderableWidget(new AbstractSliderButton(
-			leftX, startY + 100, colWidth, buttonHeight,
+			rightX, startY + 100, colWidth, buttonHeight,
 			Component.empty(),
 			(double) (config.gravityScale - 0.2f) / 1.8f
 		) {
@@ -148,9 +157,9 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		});
 
-		// Row 4 Right: Slider for Bounciness (0.0 - 0.8)
+		// Row 5 Left: Slider for Bounciness (0.0 - 0.8)
 		this.addRenderableWidget(new AbstractSliderButton(
-			rightX, startY + 100, colWidth, buttonHeight,
+			leftX, startY + 125, colWidth, buttonHeight,
 			Component.empty(),
 			(double) config.bounciness / 0.8f
 		) {
@@ -169,9 +178,9 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		});
 
-		// Row 5 Left: Slider for Ground Friction (0.1 - 1.0)
+		// Row 5 Right: Slider for Ground Friction (0.1 - 1.0)
 		this.addRenderableWidget(new AbstractSliderButton(
-			leftX, startY + 125, colWidth, buttonHeight,
+			rightX, startY + 125, colWidth, buttonHeight,
 			Component.empty(),
 			(double) (config.groundFriction - 0.1f) / 0.9f
 		) {
@@ -190,9 +199,9 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		});
 
-		// Row 5 Right: Slider for Max Active Ragdolls (4 - 100)
+		// Row 6 Left: Slider for Max Active Ragdolls (4 - 100)
 		this.addRenderableWidget(new AbstractSliderButton(
-			rightX, startY + 125, colWidth, buttonHeight,
+			leftX, startY + 150, colWidth, buttonHeight,
 			Component.empty(),
 			(double) (config.maxActiveRagdolls - 4) / 96.0
 		) {
@@ -202,7 +211,7 @@ public class RagdollsConfigScreen extends Screen {
 
 			@Override
 			protected void updateMessage() {
-				this.setMessage(Component.literal("Max Count: " + config.maxActiveRagdolls));
+				this.setMessage(Component.literal("Max: " + config.maxActiveRagdolls));
 			}
 
 			@Override
@@ -211,15 +220,6 @@ public class RagdollsConfigScreen extends Screen {
 			}
 		});
 
-		// Row 6 Left: Done
-		this.addRenderableWidget(Button.builder(
-			Component.literal("Done"),
-			btn -> {
-				config.save();
-				this.onClose();
-			}
-		).bounds(leftX, startY + 155, colWidth, buttonHeight).build());
-
 		// Row 6 Right: Reset
 		this.addRenderableWidget(Button.builder(
 			Component.literal("Reset"),
@@ -227,7 +227,16 @@ public class RagdollsConfigScreen extends Screen {
 				config.resetToDefaults();
 				this.rebuildWidgets();
 			}
-		).bounds(rightX, startY + 155, colWidth, buttonHeight).build());
+		).bounds(rightX, startY + 150, colWidth, buttonHeight).build());
+
+		// Row 7 Center: Done
+		this.addRenderableWidget(Button.builder(
+			Component.literal("Done"),
+			btn -> {
+				config.save();
+				this.onClose();
+			}
+		).bounds(x, startY + 176, buttonWidth, buttonHeight).build());
 	}
 
 	private static Component getEnabledMessage(RagdollsConfig config) {
@@ -252,6 +261,10 @@ public class RagdollsConfigScreen extends Screen {
 
 	private static Component getSmokeMessage(RagdollsConfig config) {
 		return Component.literal("Death Smoke: " + (config.deathSmokeParticles ? "ON" : "OFF"));
+	}
+
+	private static Component getDustMessage(RagdollsConfig config) {
+		return Component.literal("Ground Dust: " + (config.groundDustParticles ? "ON" : "OFF"));
 	}
 
 	@Override

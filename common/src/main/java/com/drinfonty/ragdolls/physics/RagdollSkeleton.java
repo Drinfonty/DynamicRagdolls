@@ -154,7 +154,7 @@ public final class RagdollSkeleton {
 	}
 
 	/**
-	 * Advances the ragdoll physics simulation by one client tick (20 Hz).
+	 * Advances the ragdoll physics simulation by one client tick (20 Hz) with ground dust disabled.
 	 */
 	public void step(
 		RagdollWorld world,
@@ -164,6 +164,22 @@ public final class RagdollSkeleton {
 		boolean waterBuoyancy,
 		float jointConeScale,
 		int solverIterations
+	) {
+		step(world, gravityScale, bounciness, groundFriction, waterBuoyancy, jointConeScale, solverIterations, false);
+	}
+
+	/**
+	 * Advances the ragdoll physics simulation by one client tick (20 Hz).
+	 */
+	public void step(
+		RagdollWorld world,
+		float gravityScale,
+		float bounciness,
+		float groundFriction,
+		boolean waterBuoyancy,
+		float jointConeScale,
+		int solverIterations,
+		boolean groundDustParticles
 	) {
 		for (RagdollParticle p : this.particles) {
 			p.snapshotRenderPosition();
@@ -242,11 +258,12 @@ public final class RagdollSkeleton {
 				solveTorsoLimbCollisions(torsoEx, torsoEy, torsoEz);
 				solveLimbCapsuleCollisions();
 
+				boolean spawnDust = groundDustParticles && iter == 0;
 				for (int i = 0; i < PARTICLE_COUNT; i++) {
 					if (i == CHEST_FRONT) {
 						continue;
 					}
-					resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction);
+					resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction, world, spawnDust);
 				}
 			}
 		}
@@ -266,7 +283,7 @@ public final class RagdollSkeleton {
 			if (i == CHEST_FRONT) {
 				continue;
 			}
-			resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction);
+			resolveParticleCollision(this.particles[i], worldBoxes, bounciness, groundFriction, world, false);
 		}
 		solveTorsoLimbCollisions(torsoEx, torsoEy, torsoEz);
 		solveLimbCapsuleCollisions();
@@ -707,7 +724,9 @@ public final class RagdollSkeleton {
 		RagdollParticle p,
 		List<RagdollWorld.Box> boxes,
 		float bounciness,
-		float groundFriction
+		float groundFriction,
+		RagdollWorld world,
+		boolean spawnDust
 	) {
 		double r = p.radius;
 		for (int i = 0, size = boxes.size(); i < size; i++) {
@@ -790,6 +809,18 @@ public final class RagdollSkeleton {
 				double vtX = vx - vn * nx;
 				double vtY = vy - vn * ny;
 				double vtZ = vz - vn * nz;
+
+				if (spawnDust && world != null && ny > 0.5) {
+					if (vn < -0.04) {
+						float intensity = (float) Math.min(3.0, (-vn) * 18.0);
+						world.spawnGroundDust(p.x, p.y - r, p.z, vx, vy, vz, intensity);
+					} else {
+						double speedVtSq = vtX * vtX + vtZ * vtZ;
+						if (speedVtSq > 0.02 * 0.02 && Math.random() < 0.25) {
+							world.spawnGroundDust(p.x, p.y - r, p.z, vtX, 0.0, vtZ, 0.5f);
+						}
+					}
+				}
 
 				double slipScale = Math.max(0.0, 1.0 - groundFriction * 0.45);
 				double newVn = vn < -0.015 ? -vn * bounciness : 0.0;

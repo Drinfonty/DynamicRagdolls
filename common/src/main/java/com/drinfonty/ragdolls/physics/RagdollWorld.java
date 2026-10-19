@@ -23,4 +23,17 @@ public interface RagdollWorld {
 	 * Returns true if the given world-space point is submerged in water or fluid.
 	 */
 	boolean isWater(double x, double y, double z);
+
+	/**
+	 * Spawns dust particles on block impact or slide.
+	 *
+	 * @param x world X position of particle contact
+	 * @param y world Y position of particle contact
+	 * @param z world Z position of particle contact
+	 * @param vx particle velocity X
+	 * @param vy particle velocity Y
+	 * @param vz particle velocity Z
+	 * @param intensity >= 1.0 for landing bounce, < 1.0 for ground sliding/scraping
+	 */
+	default void spawnGroundDust(double x, double y, double z, double vx, double vy, double vz, float intensity) {}
 }

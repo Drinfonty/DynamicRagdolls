@@ -81,4 +81,60 @@ public final class ClientRagdollWorld implements RagdollWorld {
 		double fluidTop = pos.getY() + fluid.getHeight(this.level, pos);
 		return y <= fluidTop;
 	}
+
+	@Override
+	public void spawnGroundDust(double x, double y, double z, double vx, double vy, double vz, float intensity) {
+		BlockPos groundPos = BlockPos.containing(x, y - 0.2, z);
+		if (!this.level.hasChunkAt(groundPos)) {
+			return;
+		}
+		BlockState state = this.level.getBlockState(groundPos);
+		if (state.isAir()) {
+			groundPos = groundPos.below();
+			if (!this.level.hasChunkAt(groundPos)) {
+				return;
+			}
+			state = this.level.getBlockState(groundPos);
+			if (state.isAir()) {
+				return;
+			}
+		}
+
+		net.minecraft.core.particles.BlockParticleOption blockParticle =
+			new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, state);
+
+		if (intensity >= 1.0f) {
+			// Ground impact/bounce: burst of debris
+			int count = Math.min(5, Math.max(2, (int) intensity));
+			for (int i = 0; i < count; i++) {
+				double spreadAngle = (Math.PI * 2.0 * i) / count + (Math.random() - 0.5) * 0.4;
+				double spreadSpeed = 0.05 + Math.random() * 0.08 * intensity;
+				double px = x + (Math.random() - 0.5) * 0.25;
+				double py = y + 0.02;
+				double pz = z + (Math.random() - 0.5) * 0.25;
+				double pvx = Math.cos(spreadAngle) * spreadSpeed + vx * 0.2;
+				double pvy = 0.08 + Math.random() * 0.12 * Math.min(2.0, intensity);
+				double pvz = Math.sin(spreadAngle) * spreadSpeed + vz * 0.2;
+				this.level.addParticle(blockParticle, px, py, pz, pvx, pvy, pvz);
+			}
+
+			// Hard landing: add subtle dust plume puff
+			if (intensity >= 2.0f) {
+				this.level.addParticle(
+					net.minecraft.core.particles.ParticleTypes.DUST_PLUME,
+					x, y + 0.05, z,
+					0.0, 0.03, 0.0
+				);
+			}
+		} else {
+			// Sliding/skidding across the block
+			double px = x + (Math.random() - 0.5) * 0.2;
+			double py = y + 0.02;
+			double pz = z + (Math.random() - 0.5) * 0.2;
+			double pvx = -vx * 0.35 + (Math.random() - 0.5) * 0.04;
+			double pvy = 0.03 + Math.random() * 0.03;
+			double pvz = -vz * 0.35 + (Math.random() - 0.5) * 0.04;
+			this.level.addParticle(blockParticle, px, py, pz, pvx, pvy, pvz);
+		}
+	}
 }

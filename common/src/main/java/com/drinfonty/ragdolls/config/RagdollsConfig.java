@@ -19,6 +19,7 @@ public class RagdollsConfig {
 	public boolean waterBuoyancy = true;
 	public boolean renderArmorAndItems = true;
 	public boolean deathSmokeParticles = false;
+	public boolean groundDustParticles = true;
 	public int ragdollLifetimeSeconds = 15; // Range: 1 to 60 seconds
 	public int maxActiveRagdolls = 32; // Range: 4 to 100
 	public float knockbackMultiplier = 1.0f; // Range: 0.2 to 3.0
@@ -48,6 +49,7 @@ public class RagdollsConfig {
 					if (obj.has("waterBuoyancy")) config.waterBuoyancy = obj.get("waterBuoyancy").getAsBoolean();
 					if (obj.has("renderArmorAndItems")) config.renderArmorAndItems = obj.get("renderArmorAndItems").getAsBoolean();
 					if (obj.has("deathSmokeParticles")) config.deathSmokeParticles = obj.get("deathSmokeParticles").getAsBoolean();
+					if (obj.has("groundDustParticles")) config.groundDustParticles = obj.get("groundDustParticles").getAsBoolean();
 					if (obj.has("ragdollLifetimeSeconds")) config.ragdollLifetimeSeconds = obj.get("ragdollLifetimeSeconds").getAsInt();
 					if (obj.has("maxActiveRagdolls")) config.maxActiveRagdolls = obj.get("maxActiveRagdolls").getAsInt();
 					if (obj.has("knockbackMultiplier")) config.knockbackMultiplier = obj.get("knockbackMultiplier").getAsFloat();
@@ -99,6 +101,7 @@ public class RagdollsConfig {
 		this.waterBuoyancy = true;
 		this.renderArmorAndItems = true;
 		this.deathSmokeParticles = false;
+		this.groundDustParticles = true;
 		this.ragdollLifetimeSeconds = 15;
 		this.maxActiveRagdolls = 32;
 		this.knockbackMultiplier = 1.0f;

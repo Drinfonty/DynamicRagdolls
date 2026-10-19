@@ -237,4 +237,46 @@ class RagdollPhysicsTest {
 			"Expected water buoyancy to keep ragdoll higher than freefall in air"
 		);
 	}
+
+	@Test
+	void testGroundDustParticleEmission() {
+		final int[] dustCount = new int[1];
+		final float[] maxIntensity = new float[1];
+
+		RagdollWorld dustTrackingWorld = new RagdollWorld() {
+			@Override
+			public List<Box> getCollisionBoxes(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+				if (minY <= 0.0 && maxY >= -1.0) {
+					return List.of(new Box(-100.0, -1.0, -100.0, 100.0, 0.0, 100.0));
+				}
+				return List.of();
+			}
+
+			@Override
+			public boolean isWater(double x, double y, double z) {
+				return false;
+			}
+
+			@Override
+			public void spawnGroundDust(double x, double y, double z, double vx, double vy, double vz, float intensity) {
+				dustCount[0]++;
+				if (intensity > maxIntensity[0]) {
+					maxIntensity[0] = intensity;
+				}
+			}
+		};
+
+		// Drop skeleton from 1.5 blocks high to impact the ground
+		RagdollSkeleton skeleton = new RagdollSkeleton(
+			0.0, 1.5, 0.0, 0.0f, 0.0f, 0.9375,
+			0.0, 0.0, 0.0, 0.15, -0.2, 0.0
+		);
+
+		for (int tick = 0; tick < 25; tick++) {
+			skeleton.step(dustTrackingWorld, 1.0f, 0.25f, 0.80f, true, 1.0f, 6, true);
+		}
+
+		assertTrue(dustCount[0] > 0, "Expected dust particles to be emitted on ground landing and sliding");
+		assertTrue(maxIntensity[0] >= 1.0f, "Expected at least one ground impact bounce with intensity >= 1.0, got " + maxIntensity[0]);
+	}
 }

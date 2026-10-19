@@ -60,6 +60,7 @@ When a player (or enabled humanoid entity) is killed:
     *   **Fluid Buoyancy**: Toggle underwater buoyancy & drag ON/OFF.
     *   **Armor & Items**: Toggle rendering equipped armor and held items on ragdolls ON/OFF.
     *   **Death Smoke**: Toggle vanilla death smoke poof particles ON/OFF (default OFF).
+    *   **Ground Dust**: Toggle block-matching debris and dust plume particles when ragdolls land or slide ON/OFF (default ON).
     *   **Lifetime**: Slider to adjust ragdoll corpse lifetime (`1s` to `60s`, default `15s`).
     *   **Max Ragdolls**: Slider to adjust maximum active ragdolls (`4` to `100`, default `32`).
     *   **Knockback Force**: Slider to adjust death impact impulse multiplier (`0.2x` to `3.0x`, default `1.0x`).
