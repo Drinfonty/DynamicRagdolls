@@ -38,6 +38,22 @@ public class LivingEntityRendererMixin<S extends LivingEntityRenderState, M exte
 
 	@Inject(
 		method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
+		at = @At("HEAD")
+	)
+	private void ragdolls$beforeSubmit(
+		S state,
+		PoseStack poseStack,
+		SubmitNodeCollector collector,
+		CameraRenderState cameraRenderState,
+		CallbackInfo ci
+	) {
+		if (state instanceof RagdollStateAttachment attachment && attachment.ragdolls$getPose() != null) {
+			RagdollModelPoseApplier.setRagdollRendering(true);
+		}
+	}
+
+	@Inject(
+		method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
 		at = @At(
 			value = "INVOKE",
 			target = "Lnet/minecraft/client/model/EntityModel;setupAnim(Ljava/lang/Object;)V",
@@ -52,5 +68,19 @@ public class LivingEntityRendererMixin<S extends LivingEntityRenderState, M exte
 		CallbackInfo ci
 	) {
 		RagdollModelPoseApplier.applyIfPresent(this.model, state);
+	}
+
+	@Inject(
+		method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
+		at = @At("RETURN")
+	)
+	private void ragdolls$afterSubmit(
+		S state,
+		PoseStack poseStack,
+		SubmitNodeCollector collector,
+		CameraRenderState cameraRenderState,
+		CallbackInfo ci
+	) {
+		RagdollModelPoseApplier.setRagdollRendering(false);
 	}
 }

@@ -11,7 +11,9 @@
 		"LivingEntityRendererMixin",
 		"MinecraftClientSmokeTestMixin",
 		"ModelFeatureRendererMixin",
-		"PlayerSpawnSmokeTestMixin"
+		"ModelPartAccessor",
+		"PlayerSpawnSmokeTestMixin",
+		"compat.EMFAnimationEntityContextMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

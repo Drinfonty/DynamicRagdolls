@@ -70,6 +70,12 @@ When a player (or enabled humanoid entity) is killed:
     *   **Ground Friction**: Slider to adjust surface sliding friction (`0.1` to `1.0`, default `0.80`).
 *   **Storage**: Saves to `config/ragdolls.json`.
 
+### 2.6 Entity Model Features (EMF) & Custom Entity Model (CEM) Compatibility
+*   **Animation Pause Interception**: Integrates safely with `EMFAnimationApi.registerPauseCondition` and injects into `traben.entity_model_features.models.animation.EMFAnimationEntityContext.isEntityAnimPaused` so that resource pack expression animations (e.g. *Fresh Animations*) are automatically paused when rendering ragdoll corpses, preventing mobs from freezing in a static/idle rest pose.
+*   **Dynamic Bone & Submodel Mapping**: Traverses model roots and part trees (`ModelPartAccessor`) to apply physical limb transforms to custom CEM limb parts (`head2`, `body2`, `left_arm2`, `right_arm2`, `left_leg2`, `right_leg2`, etc.) while recursively resetting child bone offsets to their neutral resting poses so custom faces, eyes, and segmented limbs follow physics seamlessly.
+*   **Pre-Buffer Render Pose Guarantee**: Re-applies the ragdoll pose immediately prior to `Model.renderToBuffer` in `ModelFeatureRenderer` to guarantee the ragdoll physics pose is the final transformation submitted to the vertex buffer.
+
+
 ---
 
 ## 3. Technical Design
