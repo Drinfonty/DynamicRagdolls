@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -15,53 +14,23 @@ import static org.junit.jupiter.api.Assertions.*;
 class RagdollModelPoseApplierTest {
 
 	@Test
-	void testRagdollRenderingThreadLocalState() {
-		assertFalse(RagdollModelPoseApplier.isRagdollRendering());
-		RagdollModelPoseApplier.setRagdollRendering(true);
-		assertTrue(RagdollModelPoseApplier.isRagdollRendering());
-		RagdollModelPoseApplier.setRagdollRendering(false);
-		assertFalse(RagdollModelPoseApplier.isRagdollRendering());
-	}
-
-	@Test
 	void testEMFCompatInitSafeWithoutEMF() {
 		assertDoesNotThrow(EMFCompat::init);
 	}
 
 	@Test
-	void testApplyToGenericModelWithCEMHierarchy() {
-		// Create submodel child for left arm with an initial pose
-		ModelPart leftArmSub = new ModelPart(
-			Collections.emptyList(),
-			Collections.emptyMap()
-		);
-		leftArmSub.setInitialPose(PartPose.offsetAndRotation(0.0f, 2.0f, 0.0f, 0.1f, 0.0f, 0.0f));
-		leftArmSub.resetPose();
-		// Simulate dynamic animation offset
-		leftArmSub.setPos(5.0f, 5.0f, 5.0f);
-		leftArmSub.setRotation(1.5f, 1.5f, 1.5f);
-
-		Map<String, ModelPart> leftArmChildren = new HashMap<>();
-		leftArmChildren.put("left_arm2", leftArmSub);
-
-		ModelPart leftArm = new ModelPart(
-			Collections.emptyList(),
-			leftArmChildren
-		);
-		leftArm.visible = false; // Fresh Animations hides vanilla limb
-
-		ModelPart crossedArms = new ModelPart(
-			Collections.emptyList(),
-			Collections.emptyMap()
-		);
-		crossedArms.visible = true;
-
-		ModelPart head2 = new ModelPart(
+	void testApplyToGenericModel() {
+		ModelPart head = new ModelPart(
 			Collections.emptyList(),
 			Collections.emptyMap()
 		);
 
 		ModelPart body = new ModelPart(
+			Collections.emptyList(),
+			Collections.emptyMap()
+		);
+
+		ModelPart leftArm = new ModelPart(
 			Collections.emptyList(),
 			Collections.emptyMap()
 		);
@@ -81,8 +50,14 @@ class RagdollModelPoseApplierTest {
 			Collections.emptyMap()
 		);
 
+		ModelPart crossedArms = new ModelPart(
+			Collections.emptyList(),
+			Collections.emptyMap()
+		);
+		crossedArms.visible = true;
+
 		Map<String, ModelPart> rootChildren = new HashMap<>();
-		rootChildren.put("head2", head2);
+		rootChildren.put("head", head);
 		rootChildren.put("body", body);
 		rootChildren.put("left_arm", leftArm);
 		rootChildren.put("right_arm", rightArm);
@@ -115,39 +90,22 @@ class RagdollModelPoseApplierTest {
 
 		RagdollModelPoseApplier.apply(dummyModel, pose);
 
-		// 1. Head2 should have received head transform
-		assertEquals(headTr.x(), head2.x, 1e-4f);
-		assertEquals(headTr.y(), head2.y, 1e-4f);
-		assertEquals(headTr.z(), head2.z, 1e-4f);
-		assertEquals(headTr.xRot(), head2.xRot, 1e-4f);
-		assertEquals(headTr.yRot(), head2.yRot, 1e-4f);
-		assertEquals(headTr.zRot(), head2.zRot, 1e-4f);
-		assertTrue(head2.visible);
+		// 1. Head received head transform
+		assertEquals(headTr.x(), head.x, 1e-4f);
+		assertEquals(headTr.y(), head.y, 1e-4f);
+		assertEquals(headTr.z(), head.z, 1e-4f);
+		assertEquals(headTr.xRot(), head.xRot, 1e-4f);
+		assertEquals(headTr.yRot(), head.yRot, 1e-4f);
+		assertEquals(headTr.zRot(), head.zRot, 1e-4f);
 
-		// 2. Left arm should have been made visible and received leftArm transform
-		assertTrue(leftArm.visible);
+		// 2. Arms and legs received transforms
 		assertEquals(leftArmTr.x(), leftArm.x, 1e-4f);
-		assertEquals(leftArmTr.y(), leftArm.y, 1e-4f);
-		assertEquals(leftArmTr.z(), leftArm.z, 1e-4f);
-		assertEquals(leftArmTr.xRot(), leftArm.xRot, 1e-4f);
-		assertEquals(leftArmTr.yRot(), leftArm.yRot, 1e-4f);
-		assertEquals(leftArmTr.zRot(), leftArm.zRot, 1e-4f);
-
-		// 3. Left arm submodel should have reset its dynamic pose to its initialPose
-		assertEquals(0.0f, leftArmSub.x, 1e-4f);
-		assertEquals(2.0f, leftArmSub.y, 1e-4f);
-		assertEquals(0.0f, leftArmSub.z, 1e-4f);
-		assertEquals(0.1f, leftArmSub.xRot, 1e-4f);
-		assertEquals(0.0f, leftArmSub.yRot, 1e-4f);
-		assertEquals(0.0f, leftArmSub.zRot, 1e-4f);
-
-		// 4. Crossed arms part should be hidden
-		assertFalse(crossedArms.visible);
-
-		// 5. Body and right limbs received their transforms
-		assertEquals(bodyTr.x(), body.x, 1e-4f);
 		assertEquals(rightArmTr.x(), rightArm.x, 1e-4f);
 		assertEquals(leftLegTr.x(), leftLeg.x, 1e-4f);
 		assertEquals(rightLegTr.x(), rightLeg.x, 1e-4f);
+		assertEquals(bodyTr.x(), body.x, 1e-4f);
+
+		// 3. Crossed arms part should be hidden for illager models
+		assertFalse(crossedArms.visible);
 	}
 }
